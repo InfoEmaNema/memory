@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gioco di Memory - A Livelli</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            /* Nuovo sfondo migliorato: Pois bianchi su azzurro cielo */
+            background-color: #81D4FA; 
+            background-image: radial-gradient(#FFFFFF 15%, transparent 16%), radial-gradient(#FFFFFF 15%, transparent 16%);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            font-family: 'Nunito', 'Comic Sans MS', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: #FF5722;
+            font-size: 3.5rem;
+            margin: 10px 0;
+            text-shadow: 3px 3px 0px #FFF, 5px 5px 0px rgba(0,0,0,0.1);
+        }
+
+        .hud-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-board {
+            font-size: 1.5rem;
+            color: #00838F;
+            background: #FFF;
+            padding: 10px 25px;
+            border-radius: 25px;
+            box-shadow: 0 5px 0px #4DD0E1;
+            font-weight: bold;
+        }
+
+        .memory-game {
+            display: grid;
+            /* La quantità di colonne è controllata da una variabile CSS */
+            grid-template-columns: repeat(var(--cols, 4), 90px);
+            grid-gap: 12px;
+            perspective: 1000px;
+            z-index: 10;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            width: 90px;
+            height: 90px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            backface-visibility: hidden;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .card-front {
+            background-color: #FFF;
+            transform: rotateY(180deg);
+            font-size: 55px; /* Dimensione emoji */
+            border: 4px solid #FFCA28;
+        }
+
+        .card-back {
+            background: radial-gradient(circle, #FFEB3B, #FF9800);
+            color: #FFF;
+            font-size: 55px;
+            border: 4px solid #FFF;
+        }
+        
+        .card-back::after {
+            content: '?';
+            color: #FFF;
+            text-shadow: 2px 2px 0px #E65100;
+            font-weight: 900;
+        }
+
+        /* Schermata di vittoria */
+        .victory-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .victory-screen.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .victory-title {
+            font-size: 4rem;
+            color: #E91E63;
+            margin-bottom: 30px;
+            text-shadow: 3px 3px 0px #FFF, 6px 6px 0px rgba(0,0,0,0.15);
+            animation: bounce 1s infinite alternate;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .play-again-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 2rem;
+            border-radius: 40px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            box-shadow: 0 8px 0px #2E7D32;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .play-again-btn:active {
+            transform: translateY(8px);
+            box-shadow: 0 0px 0px #2E7D32;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-20px); }
+        }
+
+        /* Confetti canvas */
+        #confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        @media (max-width: 600px) {
+            .memory-game {
+                grid-template-columns: repeat(var(--cols, 4), 70px);
+                grid-gap: 8px;
+            }
+            .card { width: 70px; height: 70px; }
+            .card-front, .card-back { font-size: 40px; }
+            h1 { font-size: 2.5rem; }
+            .info-board { font-size: 1.2rem; padding: 8px 15px; }
+            .hud-container { gap: 10px; }
+            .victory-title { font-size: 3rem; }
+            .play-again-btn { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Memory!</h1>
+    
+    <div class="hud-container">
+        <div class="info-board">Livello: <span id="level-display">1</span></div>
+        <div class="info-board">Coppie: <span id="score">0</span> / <span id="total-pairs">6</span></div>
+    </div>
+
+    <div class="memory-game" id="game-board">
+        <!-- Le carte verranno generate qui via JS -->
+    </div>
+
+    <div class="victory-screen" id="victory-screen">
+        <div class="victory-title" id="victory-title">Bravissimo! 🎉</div>
+        <button class="play-again-btn" id="next-btn" onclick="nextLevelOrReset()">Prossimo Livello!</button>
+    </div>
+
+    <canvas id="confetti"></canvas>
+
+    <script>
+        // Un sacco di emoji per i livelli più alti!
+        const allEmojis = ['🦁', '🐻', '🐱', '🐶', '🐰', '🦊', '🐼', '🐯', '🐸', '🐵', '🦄', '🐷', '🐮', '🐙', '🐢', '🐧', '🦖', '🐳', '🐘', '🦔'];
+        
+        // Configurazione dei livelli
+        const levels = [
+            { cols: 4, rows: 3 }, // Livello 1: 12 carte (6 coppie)
+            { cols: 4, rows: 4 }, // Livello 2: 16 carte (8 coppie)
+            { cols: 5, rows: 4 }, // Livello 3: 20 carte (10 coppie)
+            { cols: 6, rows: 4 }, // Livello 4: 24 carte (12 coppie)
+            { cols: 6, rows: 5 }  // Livello 5: 30 carte (15 coppie)
+        ];
+
+        let currentLevelIndex = 0;
+        let pairsToFind = 0;
+        let pairsFound = 0;
+        let hasFlippedCard = false;
+        let lockBoard = false;
+        let firstCard, secondCard;
+
+        const board = document.getElementById('game-board');
+        const scoreDisplay = document.getElementById('score');
+        const totalPairsDisplay = document.getElementById('total-pairs');
+        const levelDisplay = document.getElementById('level-display');
+        const victoryScreen = document.getElementById('victory-screen');
+        const victoryTitle = document.getElementById('victory-title');
+        const nextBtn = document.getElementById('next-btn');
+        
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function startLevel() {
+            board.innerHTML = '';
+            resetBoard();
+            pairsFound = 0;
+            scoreDisplay.innerText = pairsFound;
+            levelDisplay.innerText = currentLevelIndex + 1;
+
+            const config = levels[currentLevelIndex];
+            pairsToFind = (config.cols * config.rows) / 2;
+            totalPairsDisplay.innerText = pairsToFind;
+
+            // Aggiorna la variabile CSS per il numero di colonne
+            board.style.setProperty('--cols', config.cols);
+
+            // Prendi solo le emoji che servono per questo livello
+            const selectedEmojis = allEmojis.slice(0, pairsToFind);
+            let cardsArray = [...selectedEmojis, ...selectedEmojis];
+            cardsArray = shuffle(cardsArray);
+            
+            cardsArray.forEach((emoji) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.emoji = emoji;
+
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-face card-front">${emoji}</div>
+                        <div class="card-face card-back"></div>
+                    </div>
+                `;
+
+                card.addEventListener('click', flipCard);
+                board.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (lockBoard) return;
+            if (this === firstCard) return;
+
+            this.classList.add('flipped');
+
+            if (!hasFlippedCard) {
+                hasFlippedCard = true;
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            let isMatch = firstCard.dataset.emoji === secondCard.dataset.emoji;
+
+            if (isMatch) {
+                disableCards();
+                pairsFound++;
+                scoreDisplay.innerText = pairsFound;
+                
+                if (pairsFound === pairsToFind) {
+                    setTimeout(showVictory, 500);
+                }
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+            resetBoard();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetBoard();
+            }, 1500);
+        }
+
+        function resetBoard() {
+            [hasFlippedCard, lockBoard] = [false, false];
+            [firstCard, secondCard] = [null, null];
+        }
+
+        function showVictory() {
+            victoryScreen.classList.add('show');
+            startConfetti();
+            
+            if (currentLevelIndex < levels.length - 1) {
+                victoryTitle.innerText = "Ottimo lavoro! 🎉";
+                nextBtn.innerText = "Prossimo Livello";
+                nextBtn.style.backgroundColor = "#4CAF50"; // Verde
+                nextBtn.style.boxShadow = "0 8px 0px #2E7D32";
+            } else {
+                victoryTitle.innerText = "Hai finito tutti i livelli! 🏆 Ti sei superato!";
+                nextBtn.innerText = "Ricomincia il Gioco";
+                nextBtn.style.backgroundColor = "#FF9800"; // Arancione
+                nextBtn.style.boxShadow = "0 8px 0px #E65100";
+            }
+        }
+
+        function nextLevelOrReset() {
+            if (currentLevelIndex < levels.length - 1) {
+                currentLevelIndex++;
+            } else {
+                currentLevelIndex = 0; // Ricomincia
+            }
+            victoryScreen.classList.remove('show');
+            stopConfetti();
+            startLevel();
+        }
+
+        // --- SISTEMA DI CORIANDOLI (CONFETTI) ---
+        const canvas = document.getElementById("confetti");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particles = [];
+        let animationId = null;
+        const colors = ['#FFC107', '#FF4081', '#00BCD4', '#4CAF50', '#E040FB', '#FF5722'];
+
+        function startConfetti() {
+            particles = [];
+            for (let i = 0; i < 200; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    r: Math.random() * 6 + 4,
+                    dx: Math.random() * 4 - 2,
+                    dy: Math.random() * 5 + 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    tilt: Math.random() * 10 - 10,
+                    tiltAngle: 0,
+                    tiltAngleInc: (Math.random() * 0.07) + 0.05
+                });
+            }
+            if (!animationId) drawConfetti();
+        }
+
+        function drawConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p) => {
+                p.tiltAngle += p.tiltAngleInc;
+                p.y += p.dy;
+                p.x += Math.sin(p.tiltAngle) * 2;
+
+                ctx.beginPath();
+                ctx.lineWidth = p.r;
+                ctx.strokeStyle = p.color;
+                ctx.moveTo(p.x + p.tilt + p.r, p.y);
+                ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+                ctx.stroke();
+
+                if (p.y > canvas.height) {
+                    p.y = -20;
+                    p.x = Math.random() * canvas.width;
+                }
+            });
+            animationId = requestAnimationFrame(drawConfetti);
+        }
+
+        function stopConfetti() {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Ridimensionamento canvas
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Avvia il livello 1
+        startLevel();
+
+    </script>
+</body>
+</html>
